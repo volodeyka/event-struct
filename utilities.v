@@ -60,9 +60,6 @@ Ltac ssrnatlia := ssrnatify; lia.
 Definition opt {T T'} (f : T -> T') (x : option T) := 
   if x is some y then some (f y) else None.
 
-Definition var := nat.
-Definition tid:= nat.
-
 Notation swap := 
    (ltac:(let f := fresh "_top_" in let s := fresh "_s_" in move=> f s; move: s f)).
 
