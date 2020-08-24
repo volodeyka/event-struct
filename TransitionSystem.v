@@ -189,13 +189,14 @@ Inductive add_label :=
 | add_W : tid -> var -> val -> add_label
 | add_R (n : 'I_(n e)) t x a : compatible (lab e n) (R t x a) -> add_label.
 
+
 Definition add_event (l : add_label) := 
   match l with
   | add_W t x a      => Pack 
                          (n e).+1 
                          (add_lab (W t x a) e)
                          (add_pred e pre_pred) 
-                         (add_rf_None (W t x a) e (is_read_W t x a))
+                         (add_rf_None (W t x a) e not_false_is_true)
   | add_R k t x a RF => Pack
                          (n e).+1 
                          (add_lab (R t x a) e)
@@ -258,9 +259,7 @@ Notation "e '-*->' e'" := (ev_rel_str e e') (at level 20).
 Definition add_place e e' k := exists al, add_event e k al = e'.
 
 Lemma ev_rel_ord_le {e1 e }: e1 -*-> e -> n e1 <= n e.
-Proof.
-elim=> // ?????[?[l <-]]. rewrite/add_event. case: l=>/= *; ssrnatlia.
-Qed.
+Proof. elim=> // ?????[?[l <-]]. rewrite/add_event. case: l=>/= *; ssrnatlia. Qed.
 
 Arguments add_lab : simpl never.
 

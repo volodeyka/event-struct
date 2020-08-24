@@ -18,10 +18,6 @@ Definition is_read  l := if l is (R _ _ _) then true else false.
 
 Definition is_write l := if l is (W _ _ _) then true else false.
 
-Lemma is_read_W t x a : ~ (is_read (W t x a)).
-Proof. by []. Qed.
-
-
 Definition compatible w r := 
   match w, r with
   | (W _ x a), (R _ y b) => (x == y) && (a == b)
@@ -90,17 +86,14 @@ Proof.
 rewrite /opred. case: (pred n) =>//[[??[<-]]]. by rewrite nat_of_advance.
 Qed.
 
-Definition rf (n m : 'I_N) : bool := (orff n == some m).
+Definition rf m n := orff n == some m.
 
-Definition pre_cause := [rel m n | rf n m || rpred n m].
-
-
-Definition cause := connect [rel m n | rf n m || rpred n m].
+Definition cause := connect [rel m n | rf m n || rpred n m].
 
 Lemma rpred_cause n m: rpred n m -> cause m n.
 Proof. move=> H. apply/connect1. by rewrite/= H. Qed.
 
-Lemma rff_cause n m: rf n m -> cause m n.
+Lemma rff_cause n m: rf m n -> cause m n.
 Proof. move=> H. apply/connect1. by rewrite/= H. Qed.
 
 Lemma refl_cause: reflexive cause.
