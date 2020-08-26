@@ -203,7 +203,7 @@ Definition add_event (l : add_label) :=
   end.
 
 Lemma n_add_event l: n (add_event l) = (n e).+1.
-Proof. Admitted.
+Proof. by case: l. Qed.
 
 Definition ord_f_to_onat {N M} (f : 'I_N -> option 'I_M) (n : nat) : option nat :=
   (match n < N as L return (n < N = L -> _) with
@@ -224,8 +224,12 @@ Proof. Admitted.
 
 Lemma ord_f_to_onat_le {N M} f n k: 
   some k = (@ord_f_to_onat N M f) n -> k < M.
-Proof. Admitted.
-
+Proof.
+rewrite/ord_f_to_onat.
+case: {2}(n < N) {-1}(@erefl _ (n < N)) erefl=> {2 3}-> //.
+move=> nN. rewrite/opt. case: (f (Ordinal (n:=N) (m:=n) nN))=> //.
+move=> a []->. done.
+Qed.
 
 Definition T_f_to_onat {T N} (f : 'I_N -> T) (n : nat) : option T := 
   (match n < N as L return (n < N = L -> _) with
@@ -254,15 +258,49 @@ Definition write_of_add_lab al :=
   | add_R n _ _ _ _ => some n
   end.
 
-
 Lemma olabn_add_event al k: 
   olabn (add_event al) k = 
+<<<<<<< HEAD
   match n e =P k with (* TODO Replace with 'n e' *)
+=======
+  match (n e) =P k with (* TODO Replace with 'n e' *)
+>>>>>>> a99da49dbd4f4312dd761630ae27ad0a57fa8437
   | ReflectF p => olabn e k
   | ReflectT _ => some (lab_of_add_lab al)
   end.
-Proof. Admitted.
-
+Proof.
+rewrite/olabn/T_f_to_onat /=.
+set tn := transition_system.n e.
+case: {2}(k < n (add_event al)) {-1}(@erefl _ (k < n (add_event al))) erefl=> {2 3}->;
+case: {2}(k < n e) {-1}(@erefl _ (k < n e)) erefl=> {2 3}->;
+case: al; case: eqP=> //=.
+- move=> eq t v s kne kne1. by case: eqP.
+- move=> neq t v s kne kne1. case: eqP=> //= nek.
+  have: kne = ltS_neq_lt kne1 nek. exact: eq_irrelevance. by move=>->.
+- move=> eq n t v s comp kne kne1. by case: eqP.
+- move=> neq n t v s comp kne kne1. case: eqP=> //= nek.
+  have: kne = ltS_neq_lt kne1 nek. exact: eq_irrelevance. by move=>->.
+- move=> eq t v s knef kne1. by case: eqP.
+- move=> neq t v s knef kne1. case: eqP=> //= *.
+  have: n e = k=> //. apply/eqP. by rewrite eqn_leq leqNgt knef -ltnS kne1.
+- move=> eq n t v s comp knef kne1. by case: eqP.
+- move=> neq n t v s comp knef kne1. case: eqP=> //.
+  have: tn = k=> //. apply/eqP. by rewrite eqn_leq leqNgt knef -ltnS kne1.
+- move=> eq t v s ktn kne1f.
+  have: k < k. apply: (ltn_trans ktn). by rewrite ltnNge -ltnS kne1f.
+  by rewrite ltnn.
+- move=> neq _ _ _ ktn kne1f. have: k < k. 
+  apply: (ltn_trans ktn). by rewrite ltnNge -ltnS kne1f.
+  by rewrite ltnn.
+- move=> eq n t v s comp ktn ktn1f. have: k < k.
+  apply: (ltn_trans ktn). by rewrite ltnNge -ltnS ktn1f.
+  by rewrite ltnn.
+- move=> neq n t v s comp ktn kne1f. have: k < k.
+  apply: (ltn_trans ktn). by rewrite ltnNge -ltnS kne1f.
+  by rewrite ltnn.
+- move=> eq t v s ktnf. by rewrite -eq leqNgt ltnn.
+move=> eq n t v s comp ktnf. by rewrite -eq leqNgt ltnn.
+Qed.
 
 Lemma opredn_add_event l k: 
   opredn (add_event l) k = 
@@ -629,7 +667,7 @@ move=> k/=. rewrite/f. case: eqP => [<-|];
   by do ?case: eqP; do ?ssrnatlia.
 - move: {-2}(opredn _ k) (@erefl _ (opredn e k)).
   case=> //= a H. have: a < (n e).
-- move: H. rewrite /opredn => /(ord_f_to_onat_le e). by apply.
+- move: H. rewrite /opredn => /ord_f_to_onat_le. by apply.
 - do ?case: eqP; try (rewrite ?n_add_event//=; ssrnatlia).
 
 move=> k/=. rewrite/f. case: eqP => [<-|];
@@ -645,7 +683,7 @@ move=> k/=. rewrite/f. case: eqP => [<-|];
 - rewrite -{}EQ. case: m'=>/= ?. ssrnatlia.
 - move: {-2}(orffn _ k) (@erefl _ (orffn e k)).
   case=> //= a H. have: a < (n e).
-- move: H. rewrite /orffn => /(ord_f_to_onat_le e). by apply.
+- move: H. rewrite /orffn => /ord_f_to_onat_le. by apply.
 - do ?case: eqP; try (rewrite ?n_add_event//=; ssrnatlia).
 
 have fEQ: ((f (n e) = (n e).+1) * (f (n e).+1 = n e))%type
