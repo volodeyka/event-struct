@@ -30,7 +30,7 @@ Proof. exact: tt. Qed.
 Canonical porderType := POrderType ev_display' 'I_N orderMixin'.
 End foo.*)
 Section transition_system.
-Context {val : eqType} {dv : val}.
+Context {val : eqType}.
 Notation exec_event_struct := (@exec_event_struct val).
 Notation cexec_event_struct := (@cexec_event_struct val).
 Implicit Types (x : var) (a : val) (t : tid).
@@ -211,10 +211,15 @@ Definition ord_f_to_onat {N M} (f : 'I_N -> option 'I_M) (n : nat) : option nat 
    | false => fun=> None
    end erefl).
 
-Definition T_f_to_nat {T N} i (f : 'I_N -> T) (n : nat) : T := 
+Lemma ord_f_to_onat_le {N M} f n k: 
+  some k = (@ord_f_to_onat N M f) n -> k < M.
+Proof. Admitted.
+
+
+Definition T_f_to_onat {T N} (f : 'I_N -> T) (n : nat) : option T := 
   (match n < N as L return (n < N = L -> _) with
-   | true  => fun pf => (f (Ordinal pf))
-   | false => fun=> i
+   | true  => fun pf => some (f (Ordinal pf))
+   | false => fun=> None
    end erefl).
 
 
@@ -222,7 +227,7 @@ Definition opredn (e' : exec_event_struct) := ord_f_to_onat (opred e').
 
 Definition orffn (e' : exec_event_struct)  := ord_f_to_onat (orff e').
 
-Definition labn (e' : exec_event_struct)  := T_f_to_nat (R 0 0 dv) (lab e').
+Definition olabn (e' : exec_event_struct)  := T_f_to_onat (lab e').
 
 Definition ord_restr N (f : nat -> nat) (n : 'I_N) : nat := f n.
 
@@ -232,21 +237,35 @@ Definition lab_of_add_lab al :=
   | add_R _ t x a _ => R t x a
   end.
 
+Definition write_of_add_lab al := 
+  match al with
+  | add_W _ _ _     => None
+  | add_R n _ _ _ _ => some n
+  end.
+
 
 Lemma olabn_add_event al k: 
-  labn (add_event al) k = 
-  match k =P (n e).+1 with
-  | ReflectF p => labn e k
-  | ReflectT _ => lab_of_add_lab al
+  olabn (add_event al) k = 
+  match (n (add_event al)).-1 =P k with (* TODO Replace with 'n e' *)
+  | ReflectF p => olabn e k
+  | ReflectT _ => some (lab_of_add_lab al)
   end.
 Proof. Admitted.
 
 
 Lemma opredn_add_event l k: 
-  opredn (add_event l) k =
-  match (n (add_event l)).-1 =P k with
+  opredn (add_event l) k = 
+  match (n (add_event l)).-1 =P k with (* TODO Replace with 'n e' *)
   | ReflectT _ => (opt (@nat_of_ord (n e))) pre_pred
   | ReflectF _ => (opredn e) k
+  end.
+Proof. Admitted.
+
+Lemma orffn_add_event l k: 
+  orffn (add_event l) k =
+  match (n (add_event l)).-1 =P k with (* TODO Replace with 'n e' *)
+  | ReflectT _ => (opt (@nat_of_ord (n e))) (write_of_add_lab l)
+  | ReflectF _ => (orffn e) k
   end.
 Proof. Admitted.
 
@@ -258,48 +277,61 @@ End add_event_def.
 Definition eq_al {e1 e2 : exec_event_struct}
     (al1 : add_label e1) (al2 : add_label e2) : bool :=
 match al1, al2 with
-| add_W t x a, add_W l y b         => (t == l) && (x == y) && (a == b)
+| add_W t x a, add_W l y b         => [&& (t == l), (x == y) & (a == b)]
 | add_R n t x a _, add_R k l y b _ => 
-  (n == k :> nat) && (t == l) && (x == y) && (a == b)
+  [&& (n == k :> nat), (t == l), (x == y) & (a == b)]
 | _, _                             => false
 end.
 
 Section confluence.
 
-Definition is_iso (e e' : exec_event_struct) (f : nat -> nat) :=
+Definition is_iso_nat (e e' : exec_event_struct) (f : nat -> nat) :=
   ((((n e = n e') *  
-   (injective (ord_restr (n e) f))) *
-   ((forall k, (ord_restr (n e) f) k < n e') * (*???*)
+   (injective f)) *
+   ((forall k, k >= n e -> f k = k) * (*???*)
    ((opredn e') \o f =1 (opt f) \o (opredn e)))) *
    (((orffn e') \o f =1 (opt f) \o (orffn e)) *
-   ((labn e')  \o f =1 labn e)))%type.
+   ((olabn e')  \o f =1 olabn e)))%type.
 
-Definition equviv (a b : exec_event_struct) := exists f, is_iso a b f.
+Definition is_iso e e' (f : 'I_(n e) -> 'I_(n e')) :=
+  (((n e' = n e) *  
+  (injective f)) * (*???*)
+  (((opred e') \o f =1 (opt f) \o (opred e)) *
+  ((orff e') \o f =1 (opt f) \o (orff e))) *
+  ((lab e')   \o f =1 lab e))%type.
+
+Definition equviv e e' := exists f, is_iso e e' f.
+
+Definition equviv_nat e e' := exists f, is_iso_nat e e' f.
 
 Notation "e ~~ e'" := (equviv e e') (at level 20).
 
-Lemma is_iso_id e : is_iso e e id.
+Lemma eq_equviv e e': e ~~ e' <-> equviv_nat e e'.
 Proof. Admitted.
-(*do ?split=>//. move=>?/=; rewrite/opt; first by case: (opred _ _).
+
+Lemma is_iso_id e : is_iso e e id.
+Proof. 
+do ?split=>//; move=>?/=; rewrite/opt; first by case: (opred _ _).
 by case: (orff _ _).
-Qed.*)
+Qed.
 
 Lemma equiv_refl e: e ~~ e.
 Proof. exists id. exact: is_iso_id. Qed.
 
 Lemma opt_comp {T1 T2 T3} (f : T1 -> T2) (g : T2 -> T3) y : 
- opt (fun z => g (f z)) y = (opt g) ((opt f) y).
+  opt (fun z => g (f z)) y = (opt g) ((opt f) y).
 Proof. move: y. by case. Qed.
 
+
 Lemma equiv_trans {e1} e2 {e3}: e1 ~~ e2 -> e2 ~~ e3 -> e1 ~~ e3 .
-Proof. Admitted.
-(*case=> f1 [[[E a [b c d[f2[[[E1 a1[b1 c1 d1]]]]]]]]].
+Proof.
+case=> f1 [[[E a [b c d[f2[[[E1 a1[b1 c1 d1]]]]]]]]].
 exists (f2 \o f1); do ? split; first (by rewrite -E); move=> x.
 - by apply/inj_comp.
 - move: b1 b. rewrite/eqfun/comp=>->->. by rewrite -opt_comp.
 - move: c1 c. rewrite/eqfun/comp=>->->. by rewrite -opt_comp.
 move: d1 d. by rewrite/eqfun/comp=>->->.
-Qed.*)
+Qed.
 
 Lemma equiv_sym e1 e2: e1 ~~ e2 -> e2 ~~ e1.
 Proof. Admitted.
@@ -324,7 +356,7 @@ Proof. elim=> // ?????[?[l <-]]. rewrite/add_event. case: l=>/= *; ssrnatlia. Qe
 
 Arguments add_lab : simpl never.
 
-(*Lemma lab_add e1 e e'
+Lemma lab_add e1 e e'
   {f} (I : is_iso e e' f)
   (r : e1 -*-> e) (l : n e1 <= n e) (k : 'I_(n e1)) : 
    (lab e1 k) = (lab e' (f (widen_ord l k))).
@@ -333,27 +365,14 @@ case: I=> _; rewrite/comp=>->. move: {f} r l k.
 elim=> [???|e0 e2 e3 r IHr [k [[???<-|?????<-]/= l k']]]; 
 first (by apply/congr1/ord_inj); move: (r)=> /ev_rel_ord_le l';
 by rewrite (add_lab_eq_nat _ _ (widen_ord l' k')).
-Qed.*)
-
-(*Lemma lab_add e1 e e'
-  {f} (I : is_iso e e' f)
-  (r : e1 -*-> e) (l : n e1 <= n e) (k : 'I_(n e1)) : 
-   (lab e1 k) = (labn e' (f k)).
-Proof.
-case: I=> _; rewrite/comp=>->. move: {f} r l k.
-elim=> [e2 ? [m L]|e0 e2 e3 r IHr [k [[???<-|?????<-] l [? L]]]]//.
-- rewrite/labn/T_f_to_nat/=. case: (m < n e2).  rewrite L.
-rewrite olabn_add_event; case: eqP=> //= ?; rewrite n_add_event in l.
-1,3: exfalso; ssrnatlia. 
-all: by move: (r)=> /ev_rel_ord_le /IHr/(_ (Ordinal L)).
 Qed.
 
 Lemma comp_add e1 e e'
   {f} (I : is_iso e e' f)
-  (r : e1 -*-> e) (l : label) (k : 'I_(n e1)) :
-  compatible (labn e1 k) l ->
-  compatible (labn e' (f k)) l.
-Proof. rewrite -(lab_add e1 e e')//. exact: ev_rel_ord_le. Qed.
+  (r : e1 -*-> e) (l : label) k :
+  compatible (lab e1 k) l ->
+  compatible (lab e' (f (widen_ord (ev_rel_ord_le r) k))) l.
+Proof. by rewrite -(lab_add e1 e e'). Qed.
 
 Definition add_label_advance {e1 e e'} (r : e1 -*-> e) {f} (I : is_iso e e' f)
  : add_label e1 -> add_label e' :=
@@ -427,15 +446,80 @@ move: {-2}(comp_add _ _ _ _ _ _ _ _)
 move=> comp_add0 _. move: comp_add0.
 case: (widen_ord (ev_rel_ord_le _) m) / EQ => ?. apply/congr1.
 apply/eq_irrelevance. (* separate lemma *)
-Qed.*)
+Qed.
 
-(*Definition onat_eq_ord {N M} (n : option 'I_N) (m : option 'I_M) :=
+Definition onat_eq_ord {N M} (n : option 'I_N) (m : option 'I_M) :=
   match n, m with
   | some n, some m => n == m :> nat
   | None, None     => true
   | _   , _        => false
   end.
 
+Lemma onat_eq_ord_trans {N M K} 
+  {n : option 'I_N} (m : option 'I_M) (k : option 'I_K): 
+  onat_eq_ord n m -> onat_eq_ord m k -> onat_eq_ord n k.
+Proof. by case: n; case m=>//= ??/eqP->. Qed.
+
+Lemma onat_eq_ord_widen_ord {N M K} 
+  (n : option 'I_N) (L : N <= M) (k : option 'I_K) :
+  onat_eq_ord ((opt (id \o widen_ord L)) n) k = 
+  onat_eq_ord n k.
+Proof. by case: n. Qed.
+
+Lemma onat_eq_ord_refl {N} (n : option 'I_N): onat_eq_ord n n.
+Proof. by case: n=>/=. Qed.
+
+Hint Resolve onat_eq_ord_refl : core.
+
+Lemma onat_eq_ord_sym {N K} 
+(n : option 'I_N) (k : option 'I_K) :
+onat_eq_ord n k = 
+onat_eq_ord k n.
+Proof. by case: n; case: k=>/=. Qed.
+
+Lemma eq_al_trans {e1 e2 e3} 
+  {al1 : add_label e1} (al2 : add_label e2) (al3 : add_label e3) :
+  eq_al al1 al2 -> eq_al al2 al3 -> eq_al al1 al3.
+Proof.
+case: al1; case al2=>//= ??????; first by move/and3P=>[]/eqP->/eqP->/eqP->.
+move=> ????/and4P[]. by do ?(move/eqP=>->).
+Qed.
+
+Lemma eq_al_add_label_advane' {e1 e2: cexec_event_struct} 
+  {e3 : exec_event_struct} (C : consistance e3) r 
+  (al1 : add_label e1) (al2 : add_label e2) :
+  eq_al (@add_label_advance e1 (Consist e3 C) (Consist e3 C) r id (is_iso_id e3) al1) al2 = 
+  eq_al al1 al2.
+Proof. by case: al1. Qed.
+
+Lemma eq_al_add_label_advane {e1 e3: cexec_event_struct}
+  {e2 : exec_event_struct}  r 
+  (al1 : add_label e1) (al2 : add_label e2) :
+  eq_al (@add_label_advance e1 e3 e3 r id (is_iso_id e3) al1) al2 = 
+  eq_al al1 al2.
+Proof. by case: al1. Qed.
+
+Lemma eq_al_refl {e1} (al : add_label e1): eq_al al al.
+Proof. by case: al=>/=*; rewrite !eqxx. Qed.
+
+Hint Resolve eq_al_refl : core.
+
+Lemma eq_al_sym {e2 : exec_event_struct} {e1}
+  {al1 : add_label e1} (al2 : add_label e2)  :
+  eq_al al1 al2 = eq_al al2 al1.
+Proof.
+case: al1; case: al2=>//=.
+- move=> t x a *. by rewrite [t == _]eq_sym [x == _]eq_sym [a == _]eq_sym.
+move=> n t x a *. 
+by rewrite [n == _ :> nat]eq_sym [t == _]eq_sym [x == _]eq_sym [a == _]eq_sym.
+Qed.
+
+
+Ltac add_event_tac := move=> *;
+  do ?(match goal with
+  | H : context [n (add_event _ _ _)] |- _ =>
+     exfalso; rewrite !n_add_event/= in H
+  end); ssrnatlia.
 
 Lemma add_evC e al0 (k0 : option 'I_(n e)) 
   (al1 : add_label (add_event e k0 al0))
@@ -449,32 +533,67 @@ Lemma add_evC e al0 (k0 : option 'I_(n e))
   add_event (add_event e k0 al0) k1 al1 ~~
   add_event (add_event e k1' al1') k0' al0'.
 Proof.
-move=> Ek0 Ek1 Ea0 Ea1. rewrite/equviv/is_iso.
-set N := (n (add_event (add_event e k0 al0) k1 al1)).
-set M := (n (add_event (add_event e k1' al1') k0' al0')).
-have ENM: N = M by rewrite/N/M !n_add_event. case: M / ENM.
+move=> Ek0 Ek1 Ea0 Ea1. apply/eq_equviv. rewrite/equviv_nat/is_iso.
 set f := (fun k =>
-match N.-1 =P k with
-| ReflectT _ => N.-2
-| ReflectF p     =>
-     match N.-2 =P k with
-     | ReflectT _ => N.-1
-     | ReflectF p'    => k
+match (n e).+1 =P k with
+| ReflectT _ => (n e)
+| ReflectF p =>
+     match (n e) =P k with
+     | ReflectT _  => (n e).+1
+     | ReflectF p' => k
      end
 end).
-exists f; do ?split. admit. admit.
-move=> k/=. rewrite/f. case: eqP => [<-|].
-- rewrite opredn_add_event. case: eqP=> [E|_].
-- exfalso. rewrite/N !n_add_event in E. ssrnatlia.
-- rewrite opredn_add_event. case: eqP=> [_|E].
-- rewrite opredn_add_event. case: eqP=> [_|E].
-- rewrite -opt_comp. move: Ek1 {N}. case: k1.
-- exfalso. rewrite/N !n_add_event in E. ssrnatlia.
-  exfalso; rewrite/N !n_add_event in E; ssrnatlia.
+have If: injective f.
+- move=> x y. rewrite/f; do ?(case: eqP); ssrnatlia.
+exists f; do ?split=>//.
+- by rewrite !n_add_event.
+- move=> k. rewrite !n_add_event /f; do ?(case: eqP); ssrnatlia.
+move=> k/=. rewrite/f. case: eqP => [<-|];
+  rewrite !opredn_add_event; do ?(case: eqP); try add_event_tac;
+  rewrite ?n_add_event/=.
+- move=> _ _ _. rewrite -opt_comp. move: {f If} Ek1.
+  case: k1=> //=; case: k1' al0 {al1  al0' k0' Ea0 Ea1 Ek0} =>// a b c/eqP->.
+  case: eqP => [|_]; case: a=> ?/=; first by  move/swap=><-; ssrnatlia.
+  case: eqP=> //<-. ssrnatlia.
+1,2: do ?move=> _. 
+- rewrite -opt_comp. move: {f If} Ek0.
+  case: k0'=> //=; case: k0 al1 {k1 Ea0 Ek1}=> //= [[/=?? _[/=??]]]/eqP<-.
+  by do ?case: eqP; do ?ssrnatlia.
+- move: {-2}(opredn _ k) (@erefl _ (opredn e k)).
+  case=> //= a H. have: a < (n e).
+- move: H. rewrite /opredn => /(ord_f_to_onat_le e). by apply.
+- do ?case: eqP; try (rewrite ?n_add_event//=; ssrnatlia).
 
-have: M = N. admit.
- rewrite/M/N/add_event. case: ifP.
+move=> k/=. rewrite/f. case: eqP => [<-|];
+  rewrite !orffn_add_event; do ?(case: eqP); try add_event_tac;
+  rewrite ?n_add_event/=.
+- move=> _ _ _. rewrite -opt_comp. move: {f If} Ea0.  case: al1; case: al1' al0' {Ea1 k0' Ek0} =>//m ??? _ _ ?????/=/and4P[/eqP->].
+  do 2?(case: eqP=> //); try (case: m=>/= ?; ssrnatlia).
+1,2: do ?move=> _.
+- rewrite -opt_comp. move: {f If} Ea1.
+  case: al0'; case: al0 {al1 Ea0 k1 Ek1}=> //= m' ??? _ m ??? _ /and4P[/eqP];
+  move=> EQ; move: (EQ)=>->.
+  do 2?(case: eqP=> //); first by case: m {EQ}=>/= ?; rewrite n_add_event; ssrnatlia.
+- rewrite -{}EQ. case: m'=>/= ?. ssrnatlia.
+- move: {-2}(orffn _ k) (@erefl _ (orffn e k)).
+  case=> //= a H. have: a < (n e).
+- move: H. rewrite /orffn => /(ord_f_to_onat_le e). by apply.
+- do ?case: eqP; try (rewrite ?n_add_event//=; ssrnatlia).
 
+have fEQ: ((f (n e) = (n e).+1) * (f (n e).+1 = n e))%type
+ by split; rewrite/f; do ?(case: eqP); ssrnatlia.
+move=> k/=. have IE: (n e <> k) -> (n e).+1 <> f k.
+- move=> nE E. apply/nE/If. by rewrite fEQ.
+rewrite !olabn_add_event. do ?(case: eqP); rewrite !n_add_event/=.
+1,5,7,8: move=><-; rewrite fEQ; ssrnatlia.
+2: move/IE; ssrnatlia.
+3: rewrite -{3}fEQ=> ?? /If; ssrnatlia.
+- move=> *. move: Ea1. case: al0 {al1 Ea0 Ek1 k1}; case: al0'=> //=.
+3: move=> *; move: Ea0; case: al1; case: al1' {al0' Ea1 k0' Ek0}=> //=.
+1,3: move=> ?????? /and3P[]; by do ?move/eqP=>->.
+1,2: move=> ??????????/and4P[?]; by do ?move/eqP=>->.
+move=> *. have->//: f k = k. rewrite/f; do ?(case eqP); ssrnatlia.
+Qed.
 
 Lemma add_lem e1 e e'
   (k : option 'I_(n e1))
@@ -513,13 +632,13 @@ have r0: e0 -*-> e by rewrite EQ.  move: EQ r. elim: r0.
   move: {-2}(opt (id \o widen_ord (ev_rel_ord_le r0)) k) 
   (@erefl _ (opt (id \o widen_ord (ev_rel_ord_le r0)) k))
   {-2}(add_label_advance r0 (is_iso_id e4) al)
-  (@erefl _ (add_label_advance r0 (is_iso_id e4) al)).
-  move=> o Eo al'' Eal''. have: onat_eq_ord o k. admit.
-  have: eq_al al'' al. admit. move: o al'' {Eal'' Eo}.
-  case: (ev_struct_of e4) / E => *. apply/add_evC.
-
-  move: {-2}(widen_ord _) (@erefl _ (widen_ord (ev_rel_ord_le r0))).
-
+  (@erefl _ (add_label_advance r0 (is_iso_id e4) al)) => o Eo al'' Eal''. 
+  have: onat_eq_ord o k by rewrite Eo onat_eq_ord_widen_ord.
+  have: eq_al al'' al by rewrite Eal'' eq_al_add_label_advane.
+  move: o al'' {Eal'' Eo}. case: (ev_struct_of e4) / E => *.
+  apply/add_evC=>/=.
+1,2: by rewrite onat_eq_ord_widen_ord (onat_eq_ord_sym, onat_eq_ord_refl).
+all: by rewrite (eq_al_add_label_advane', eq_al_add_label_advane)// eq_al_sym.
 Qed.
 
 Definition confluence_rel e1 e2 :=
@@ -545,7 +664,7 @@ by exists (opt (f \o widen_ord (ev_rel_ord_le r)) x),  (add_label_advance r I al
 Qed.
 
 Theorem confluence e e1 e2 : e2 -*-> e1 -> e2 -*-> e -> e1 ~c~ e.
-Proof. elim=> [*|? l ?? H ?/H?]; by [exists e, e|apply/(confuense_add l)]. Qed.*)
+Proof. elim=> [*|? l ?? H ?/H?]; by [exists e, e|apply/(confuense_add l)]. Qed.
 End confluence.
 
 End transition_system.
