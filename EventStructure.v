@@ -170,10 +170,10 @@ end erefl) |
 | _      => fun=> false
 end erefl)].
 
-Next Obligation. move: e0=> /pred_le. ssrnatlia. Qed.
-Next Obligation. move: e0=> /pred_le. ssrnatlia. Qed.
-Next Obligation. move: e0=> /orff_le. ssrnatlia. Qed.
-Next Obligation. move: e0=> /orff_le. ssrnatlia. Qed.
+Next Obligation. move: e0=> /pred_le. slia. Qed.
+Next Obligation. move: e0=> /pred_le. slia. Qed.
+Next Obligation. move: e0=> /orff_le. slia. Qed.
+Next Obligation. move: e0=> /orff_le. slia. Qed.
 
 Notation "a # b" := (conflict a b) (at level 10).
 
