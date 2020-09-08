@@ -323,7 +323,17 @@ Lemma orffn_add_event l k:
   | ReflectT _ => (opt (@nat_of_ord (n e))) (write_of_add_lab l)
   | ReflectF _ => (orffn e) k
   end.
-Proof. Admitted.
+Proof.
+case: eqP; rewrite/orffn/ord_dom_to_nat.
+- dep_case=> [L?|]; last (rewrite n_add_event; slia).
+  rewrite orff_add_event/=. dep_case; first (by move=>*; exfalso; slia).
+  by case: l L.
+do ?dep_case=>//.
+- move=> L *. rewrite orff_add_event/=. dep_case; last by rewrite L.
+  move=> L'. have->: (Ordinal L') = (Ordinal L) by apply/ord_inj.
+  by case: (orff e (Ordinal (n:=n e) (m:=k) L)).
+all: move=> ? L ?; exfalso; rewrite n_add_event in L; slia.
+Qed.
 
 End add_event_def.
 
