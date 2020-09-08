@@ -59,11 +59,6 @@ Definition opred x : option 'I_N :=
     then some (advance x y) 
   else None.
 
-(*Lemma opred_spec*)
-(*Lemma orff_spec*)
-(*Lemma add_opred_spec*)
-(*Lemma add_orff_spec*)
-
 Definition rpred x y := opred x == some y.
 
 
@@ -146,7 +141,7 @@ Import Order.LTheory.
 Open Scope order_scope.
 Import Order.NatOrder.
 
-(*Notation "x <=c y" := (@Order.le ev_display _ x y) (at level 10).*)
+Notation "x <=c y" := (@Order.le ev_display _ x y) (at level 10).
 
 (* base of conflict relation *)
 Definition pre_conflict n m := [&& (n != m), opred n == opred m & (thread_id (lab n) == thread_id (lab m))].
@@ -296,3 +291,5 @@ Canonical consist_subType := [subType for ev_struct_of].
 Lemma consist_inj : injective (ev_struct_of). Proof. exact: val_inj. Qed.
 
 End prime_event_structure.
+Notation "x <=c y" := (@Order.le ev_display _ x y) (at level 10).
+Notation "a # b" := (conflict _ a b) (at level 10).
