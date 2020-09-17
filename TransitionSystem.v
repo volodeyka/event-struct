@@ -311,7 +311,7 @@ Lemma orff_add_event al y :
   | true  => fun pf => if (orff e (Ordinal pf)) is Some a
                            then some (widen_ord (@n_add_event_le_n _) a)
                        else None
-  | flase => fun=> if (write_of_add_lab al) is Some a
+  | false => fun=> if (write_of_add_lab al) is Some a
                      then some (widen_ord (@n_add_event_le_n _) a)
                    else None
   end) erefl.
@@ -569,11 +569,11 @@ Qed.
 Definition is_iso e e' (f : 'I_(n e) -> 'I_(n e')) :=
   ((n e = n e') * (is_mono e e' f))%type.
 
-Definition equviv e e' := exists f, is_iso e e' f.
+Definition equiv e e' := exists f, is_iso e e' f.
 
-Definition equviv_nat e e' := exists f, is_iso_nat e e' f.
+Definition equiv_nat e e' := exists f, is_iso_nat e e' f.
 
-Notation "e ~~ e'" := (equviv e e') (at level 20).
+Notation "e ~~ e'" := (equiv e e') (at level 20).
 
 Lemma iff_and (A B C : Prop): (A -> (B <-> C)) -> (A * B <-> A * C).
 Proof. move=> H. by split=> [][pA]; move/H: (pA)=> eBC /eBC. Qed.
@@ -581,7 +581,7 @@ Proof. move=> H. by split=> [][pA]; move/H: (pA)=> eBC /eBC. Qed.
 Lemma eq_is_iso e e' f:  is_iso e e' f <-> is_iso_nat e e' (ord_f_to_nat 0 f).
 Proof. apply/iff_and=> E. apply/eq_is_mono.  by rewrite {3}E subnn. Qed.
 
-Lemma eq_equviv e e': e ~~ e' <-> equviv_nat e e'.
+Lemma eq_equiv e e': e ~~ e' <-> equiv_nat e e'.
 Proof.
 split=> [[f /eq_is_iso ?]|[f]]; first by exists (ord_f_to_nat 0 f).
 move=> [?/is_mono_nat_ex[g?]]. exists g. by split.
@@ -619,7 +619,7 @@ move: (z (g k))=>/=<-. by rewrite (c k).
 Qed.
 
 End Homorphism.
-Notation "e ~~ e'" := (equviv e e') (at level 20).
+Notation "e ~~ e'" := (equiv e e') (at level 20).
 
 Implicit Type (e : cexec_event_struct).
 
@@ -720,7 +720,7 @@ Lemma add_equiv_nat {e e'}
   {al : add_label e} {al' : add_label e'}
   f {I : is_iso e e' f}: 
   eq_al (add_label_advance (Base e) I al) al' ->
-  equviv_nat (add_event e k al) (add_event e' ((opt f) k) al').
+  equiv_nat (add_event e k al) (add_event e' ((opt f) k) al').
 Proof.
 move/eq_is_iso: (I). set g := (ord_f_to_nat 0 f) => [[E[[Ig P[]]]]].
 have L: forall k, n e <= k -> g k = k. 
@@ -830,7 +830,7 @@ case: N' EQ i {M y' C}=>/= m L'<-. case E: (m == n e)=>//.
 exfalso. move/eqP: E L'. slia.
 Qed.
 
-Lemma consist_equviv (e e' : exec_event_struct):
+Lemma consist_equiv (e e' : exec_event_struct):
   e ~~ e' -> consistance e -> consistance e'.
 Proof.
 move/equiv_sym=>[f Is]. case:(Is)=>[E [[If ?[Erf ?]]]]. rewrite/consistance=>H.
@@ -850,8 +850,8 @@ Lemma rf_cosist_add {e1 e e'}
   (r : e1 -*-> e) : consistance (add_event e1 k al) -> 
   consistance (add_aux k al I r).
 Proof.
-move=> C. apply/(consist_equviv (add_aux k al (is_iso_id e) r)).
-- apply/eq_equviv. rewrite/add_aux 2?opt_comp. 
+move=> C. apply/(consist_equiv (add_aux k al (is_iso_id e) r)).
+- apply/eq_equiv. rewrite/add_aux 2?opt_comp. 
   have->: opt id =1 id by move=> T[].
   apply/(add_equiv_nat f). case: al {C}=> //= [???|?????]; rewrite !eqxx//.
   apply/and4P. do ?(split=>//). by apply/eqP/congr1/congr1/ord_inj.
@@ -874,7 +874,7 @@ Lemma add_equiv e1 e e'
   f (I : is_iso e e' f) r rc: 
   (add e1 e e k al (is_iso_id e) r rc) ~~ (add e1 e e' k al I r rc).
 Proof.
-apply/eq_equviv. rewrite/add/=/add_aux/comp. rewrite 2?opt_comp -opt_comp.
+apply/eq_equiv. rewrite/add/=/add_aux/comp. rewrite 2?opt_comp -opt_comp.
 apply/add_equiv_nat=>//. case: al {rc}=> //= [???|?????]; rewrite !eqxx//.
 apply/and4P. do ?(split=>//). by apply/eqP/congr1/congr1/ord_inj.
 Qed.
@@ -932,7 +932,7 @@ Lemma add_evC e al0 (k0 : option 'I_(n e))
   add_event (add_event e k0 al0) k1 al1 ~~
   add_event (add_event e k1' al1') k0' al0'.
 Proof.
-move=> Ek0 Ek1 Ea0 Ea1. apply/eq_equviv. rewrite/equviv_nat/is_iso.
+move=> Ek0 Ek1 Ea0 Ea1. apply/eq_equiv. rewrite/equiv_nat/is_iso.
 set f := (fun k =>
 match (n e).+1 =P k with
 | ReflectT _ => (n e)
