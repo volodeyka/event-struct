@@ -1,7 +1,7 @@
 From Coq Require Import Relations Relation_Operators.
 From mathcomp Require Import ssreflect ssrbool ssrfun eqtype seq order.
 From Equations Require Import Equations.
-From event_struct Require Import utilities wftype.
+From event_struct Require Import utilities wftype monads.
 
 Set Implicit Arguments.
 Unset Printing Implicit Defensive.
