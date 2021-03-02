@@ -1,4 +1,5 @@
 From Coq Require Import Relations Relation_Operators.
+From RelationAlgebra Require Import lattice monoid rel kat_tac.
 From mathcomp Require Import ssreflect ssrbool ssrfun eqtype seq order.
 From Equations Require Import Equations.
 From event_struct Require Import utilities wftype monads.
@@ -9,6 +10,7 @@ Set Equations Transparent.
 
 Import Order.LTheory.
 Local Open Scope order_scope.
+Local Open Scope ra_terms.
 
 Arguments clos_rtn1_rt {_ _ _ _}.
 Arguments clos_rt_rt1n {_ _ _ _}.
@@ -22,25 +24,31 @@ Arguments reflexive {_}.
 Arguments rtn1_trans {_ _ _ _ _}.
 Arguments rtn1_refl {_ _ _}.
 
-Section well_founded.
-
 Definition sfrel {T : eqType} (f : T -> seq T) : rel T :=
   [rel a b | a \in f b].
 
-Definition strict {T : eqType} (f : T -> seq T) : T -> seq T :=
-  fun n => filter^~ (f n) (fun x => x != n).
+Section Strictify.
 
-Notation "f '\eq'" := (strict f) (at level 5, format "f '\eq'").
+Context {T : eqType}.
+Implicit Type (f : T -> seq T).
 
-Lemma strict_in_sfrel {T : eqType} (f : T -> seq T) a b : 
-  sfrel f\eq a b -> sfrel f a b.
-Proof. by rewrite /strict /sfrel /= mem_filter => /andP[]. Qed.
+Definition strictify f : T -> seq T :=
+  fun x => filter^~ (f x) (fun y => y != x).
 
-Lemma in_strict {T : eqType} (f : T -> seq T) a b :
-  (a != b) -> (a \in f b) -> ((sfrel f\eq) a b).
-Proof. by rewrite /sfrel /strict /= mem_filter => -> ->. Qed. 
+Lemma strictify_weq f :
+  sfrel (strictify f) ≡ (sfrel f \ eq_op).
+Proof. 
+  move=> x y; rewrite /sfrel /strictify /=.
+  by rewrite mem_filter andbC.
+Qed.
 
-Hint Resolve strict_in_sfrel in_strict : core.
+Lemma strictify_leq f : 
+  sfrel (strictify f) ≦ sfrel f.
+Proof. by rewrite strictify_weq; lattice. Qed.
+
+End Strictify. 
+
+Section well_founded.
 
 Context {disp : unit} {T : wfType disp}.
 
@@ -48,16 +56,16 @@ Variable (f : T -> seq T).
 
 Hypothesis descend : forall x n, x \in f n -> x <= n.
 
-Lemma strict_lt n k : k \in f\eq n -> k < n.
-Proof. by rewrite mem_filter lt_neqAle => /andP[] -> /descend ->. Qed.
+Lemma strict_lt n k : k \in (strictify f) n -> k < n.
+Proof. by rewrite mem_filter lt_neqAle=> /andP[] -> /descend ->. Qed.
 
 Hint Resolve strict_lt : core.
 
-Lemma rel_sublt a b : (sfrel f\eq) a b -> a < b.
-Proof. rewrite/sfrel /=. exact: strict_lt. Qed.
+Lemma rel_sublt a b : (sfrel (strictify f)) a b -> a < b.
+Proof. exact: strict_lt. Qed.
 
 Definition s_up_set_aux n (g : forall x : T, x < n -> seq T) := 
-  let ys := f\eq n in 
+  let ys := strictify f n in 
   let ps := flatten (map^~ ys (fun x => 
   if x \in ys =P true is ReflectT pf then
     g x (strict_lt _ _ pf)
@@ -76,19 +84,19 @@ Equations s_up_set (n : T) : seq T by wf n (<%O : rel T) :=
 
 Definition t_closure (a b : T) : bool := a \in s_up_set b.
 
-Lemma clos_trans_n1_lt a b : clos_trans_n1 (sfrel f\eq) a b -> a < b.
+Lemma clos_trans_n1_lt a b : clos_trans_n1 (sfrel (strictify f)) a b -> a < b.
 Proof.
   rewrite/sfrel //=.
   elim=> [x| x y xfy acx ax]. auto.
   apply: lt_trans; first exact: ax. auto.
 Qed.
 
-Lemma clos_trans_lt a b : clos_trans (sfrel f\eq) a b -> a < b.
+Lemma clos_trans_lt a b : clos_trans (sfrel (strictify f)) a b -> a < b.
 Proof. move=> cab. by apply /clos_trans_n1_lt /clos_trans_tn1. Qed.
 
 (* Transitive closure reflection lemma *)
 Lemma t_closure_n1P a b : 
-  reflect (clos_trans_n1 (sfrel f\eq) a b) (t_closure a b).
+  reflect (clos_trans_n1 (sfrel (strictify f)) a b) (t_closure a b).
 Proof.
   rewrite /t_closure. funelim (s_up_set b)=> /=. 
   apply /(iffP idP); rewrite mem_cat /sfrel /=.
@@ -100,7 +108,7 @@ Proof.
 Qed.
 
 Lemma t_closureP a b :
-  reflect (clos_trans (sfrel f\eq) a b) (t_closure a b).
+  reflect (clos_trans (sfrel (strictify f)) a b) (t_closure a b).
 Proof.
   apply /(iffP idP) => [/t_closure_n1P| cab]; first exact: clos_tn1_trans.
   apply /t_closure_n1P. exact: clos_trans_tn1.
@@ -152,11 +160,11 @@ Proof.
 Qed.
 
 Lemma filter_clos_sub a b :
-  clos_trans_n1 (sfrel f\eq) a b -> clos_trans_n1 (sfrel f) a b.
+  clos_trans_n1 (sfrel (strictify f)) a b -> clos_trans_n1 (sfrel f) a b.
 Proof.
   elim=> [c sfac | c d sfcd ctacn ctac].
-  { apply /tn1_step. move: sfac. auto. }
-  apply /tn1_trans; last exact: ctac. move: sfcd. auto.
+  { apply/tn1_step; exact: strictify_leq. }
+  by apply: tn1_trans ctac; apply: strictify_leq.
 Qed.
 
 Lemma refl_trans_refl_rt a b :
@@ -170,11 +178,11 @@ Proof.
     by rewrite /rt_closure /up_set /t_closure in_cons => ->. }
   constructor. apply /t_closureP. elim: crtac => //.
   case: (a =P c) => [->|nac].
-  { constructor. auto. }
+  { by constructor; rewrite strictify_weq /=; apply/andP. }
   apply /t_trans.
   { move: (rt_closure_reflP a c rtac) => /clos_reflE. case; first by [].
   exact: t_closureP. }
-  constructor. auto.
+  by constructor; rewrite strictify_weq /=; apply/andP. 
 Qed.
 
 Lemma rt_closure_refl a : rt_closure a a.
