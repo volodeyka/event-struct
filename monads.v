@@ -1,4 +1,4 @@
-From mathcomp Require Import all_ssreflect.
+From mathcomp Require Import ssrfun.
 From monae Require Import category.
 
 Import Monad.
