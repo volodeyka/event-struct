@@ -1,24 +1,18 @@
 From mathcomp Require Import ssrfun.
-From monae Require Import category.
+From monae Require Import hierarchy.
 
 Import Monad.
-Local Open Scope category_scope.
+Local Open Scope monae_scope.
 
 Module MonadMorphism.
 
-Definition kleisli {C : category} {M : monad C} {a b c : C}
-  (f : {hom a, M b}) (g : {hom b, M c}) := 
-    fun x => Bind g (f x).
-
-Notation "f >=> g" := (kleisli f g) (at level 69).
-
-Record mixin_of (C : category) (M N : monad C) (η : M ~> N) := Mixin {
+Record mixin_of (M N : monad) (η : M ~> N) := Mixin {
   _ : forall A, η A \o Ret = Ret;
-  _ : forall a b c (f : {hom a, M b}) (g : {hom b, M c}),
-        η c \o (f >=> g) = [hom η b \o f] >=> [hom η c \o g]
+  _ : forall a b c (f : a -> M b) (g : b -> M c),
+        η c \o (f >=> g) =  (η b \o f) >=> (η c \o g)
 }.
-Structure type (C : category) (M N : monad C) (η : M ~> N) := Pack
-  { cpmm : M ~> N ; class : mixin_of C M _ cpmm }.
+Structure type (M N : monad) (η : M ~> N) := Pack
+  { cpmm : M ~> N ; class : mixin_of M _ cpmm }.
 Module Exports.
 Coercion cpmm : type >-> Natural.type.
 Notation "h ~M> g" := (type h g) (at level 1).
